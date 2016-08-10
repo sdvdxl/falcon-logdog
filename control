@@ -35,7 +35,7 @@ function start() {
         echo "Config file $conf doesn't exist, creating one."
         cp cfg.example.json $conf
     fi
-    nohup ./$app -c $conf &> $logfile &
+    nohup ./$app &> $logfile &
     sleep 1
     running=`ps -p $! | grep -v "PID TTY" | wc -l`
     if [ $running -gt 0 ];then
