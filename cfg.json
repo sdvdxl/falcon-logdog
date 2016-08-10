@@ -7,7 +7,9 @@
   "prefix": "",
   "suffix": "",
   "keywords": [
-    "key1",
-    "key2"
+    {
+      "exp": "key1",
+      "tag": "tag1"
+    }
   ]
 }

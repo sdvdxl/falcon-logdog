@@ -17,8 +17,13 @@ type Config struct {
 	Prefix   string //log前缀
 	Suffix   string //log后缀
 	Agent    string //agent api url
-	Keywords []string
+	Keywords []keyWord
 	Regs     []*regexp.Regexp `json:"-"`
+}
+
+type keyWord struct {
+	Exp string
+	Tag string
 }
 
 //说明：这7个字段都是必须指定
@@ -86,9 +91,15 @@ func checkConfig(config *Config) {
 		log.Fatal("keyword list not set")
 	}
 
+	for _, v := range config.Keywords {
+		if v.Exp == "" || v.Tag == "" {
+			log.Fatal("keyword's exp and tag are requierd")
+		}
+	}
+
 	// 检查正则表达式
 	config.Regs = make([]*regexp.Regexp, 0, 10)
 	for _, v := range config.Keywords {
-		config.Regs = append(config.Regs, regexp.MustCompile(v))
+		config.Regs = append(config.Regs, regexp.MustCompile(v.Exp))
 	}
 }
