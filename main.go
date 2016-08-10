@@ -30,16 +30,16 @@ func main() {
 
 	cfg := config.ReadConfig("cfg.json")
 
-	logFile := getLogFile(&cfg)
-	if logFile != "" {
-		logTail = readFile(logFile, &cfg)
-	}
-
 	ticker := time.NewTicker(time.Second * 5)
 	select {
 	case <-ticker.C:
-		config.Logger.Println("INFO: time to push data ", keywords.Items())
+		log.Println("INFO: time to push data ", keywords.Items())
 		postData(keywords, &cfg)
+	}
+
+	file := getLogFile(&cfg)
+	if file != "" {
+		logTail = readFile(file, &cfg)
 	}
 
 	logFileWatcher(&cfg)
@@ -48,7 +48,7 @@ func main() {
 func logFileWatcher(cfg *config.Config) {
 	watcher, err := fsnotify.NewWatcher()
 	if err != nil {
-		config.Logger.Fatal(err)
+		log.Fatal(err)
 	}
 
 	defer watcher.Close()
@@ -81,10 +81,10 @@ func logFileWatcher(cfg *config.Config) {
 
 func readFile(filename string, c *config.Config) *tail.Tail {
 
-	config.Logger.Println("INFO: read file", filename)
+	log.Println("INFO: read file", filename)
 	tail, err := tail.TailFile(filename, tail.Config{Follow: true})
 	if err != nil {
-		config.Logger.Fatal(err)
+		log.Fatal(err)
 	}
 
 	go func() {
@@ -107,7 +107,7 @@ func getLogFile(cfg *config.Config) string {
 		return err
 	})
 
-	config.Logger.Println("read log file:", result)
+	log.Println("read log file:", result)
 
 	return result
 }
@@ -118,7 +118,6 @@ func handleKeywords(line string, c *config.Config) {
 		tags := ""
 		for _, foundStr := range p.FindAllString(line, -1) {
 			tags += p.String() + "=" + foundStr + ","
-			fmt.Println("========= found:", foundStr)
 		}
 
 		if tags == "" {
@@ -158,13 +157,13 @@ func postData(m cmap.ConcurrentMap, c *config.Config) {
 
 		bytes, err := json.Marshal(data)
 		if err != nil {
-			config.Logger.Println("ERROR : marshal push data", data, err)
+			log.Println("ERROR : marshal push data", data, err)
 			return
 		}
 
 		resp, err := http.Post(c.Agent, "plain/text", strings.NewReader(string(bytes)))
 		if err != nil {
-			config.Logger.Println("ERROR: post data ", string(bytes), " to agent ", err)
+			log.Println("ERROR: post data ", string(bytes), " to agent ", err)
 		} else {
 			defer resp.Body.Close()
 			bytes, _ = ioutil.ReadAll(resp.Body)

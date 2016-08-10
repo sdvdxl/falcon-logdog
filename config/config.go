@@ -9,19 +9,6 @@ import (
 	"strings"
 )
 
-var Logger *log.Logger
-
-func init() {
-	os.Mkdir("var", 0766)
-	f, err := os.OpenFile("var/app.log", os.O_RDWR|os.O_APPEND|os.O_CREATE, 0666)
-	if err != nil {
-		log.Fatal("can not open or create file var/app.log  ", err)
-	}
-
-	Logger = log.New(f, "\n", log.Ldate|log.Ltime|log.Lshortfile)
-
-}
-
 type Config struct {
 	Metric   string //度量名称,比如log.console 或者log
 	Host     string //主机名称
@@ -52,7 +39,7 @@ type PushData struct {
 func ReadConfig(configFile string) Config {
 	f, err := os.Open(configFile)
 	if err != nil {
-		Logger.Fatal(err)
+		log.Fatal(err)
 	}
 	defer f.Close()
 	bytes, err := ioutil.ReadAll(f)
@@ -62,7 +49,7 @@ func ReadConfig(configFile string) Config {
 
 	var config Config
 	if err := json.Unmarshal(bytes, &config); err != nil {
-		Logger.Fatal("cfg.json has error", err)
+		log.Fatal("cfg.json has error", err)
 	}
 
 	// 检查配置项目
@@ -76,18 +63,18 @@ func checkConfig(config *Config) {
 	//检查路径
 	fInfo, err := os.Stat(config.Path)
 	if err != nil {
-		Logger.Fatal(err)
+		log.Fatal(err)
 	}
 
 	if !fInfo.IsDir() {
-		Logger.Fatal("path should be dir, not a file")
+		log.Fatal("path should be dir, not a file")
 	}
 
 	//检查后缀,如果没有,则默认为.log
 	config.Prefix = strings.TrimSpace(config.Prefix)
 	config.Suffix = strings.TrimSpace(config.Suffix)
 	if config.Suffix == "" {
-		Logger.Println("suffix is no set, will use .log")
+		log.Println("suffix is no set, will use .log")
 		config.Suffix = ".log"
 	}
 
@@ -95,7 +82,7 @@ func checkConfig(config *Config) {
 
 	//检查keywords
 	if len(config.Keywords) == 0 {
-		Logger.Fatal("keyword list not set")
+		log.Fatal("keyword list not set")
 	}
 
 	// 检查正则表达式
