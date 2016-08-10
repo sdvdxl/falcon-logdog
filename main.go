@@ -36,9 +36,8 @@ func main() {
 
 	go func() {
 		ticker := time.NewTicker(time.Second * step)
-		select {
-		case <-ticker.C:
-			log.Println("INFO: time to push data: ", keywords.Items())
+		for t := range ticker.C {
+			log.Println("INFO: time to push data: ", keywords.Items(), t)
 			postData(keywords, &cfg)
 		}
 
@@ -175,7 +174,7 @@ func postData(m cmap.ConcurrentMap, c *config.Config) {
 			} else {
 				defer resp.Body.Close()
 				bytes, _ = ioutil.ReadAll(resp.Body)
-				fmt.Println(bytes)
+				fmt.Println("INFO:", string(bytes))
 			}
 		}
 
