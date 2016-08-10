@@ -18,12 +18,12 @@ type Config struct {
 	Suffix   string //log后缀
 	Agent    string //agent api url
 	Keywords []keyWord
-	Regs     []*regexp.Regexp `json:"-"`
 }
 
 type keyWord struct {
-	Exp string
-	Tag string
+	Exp   string
+	Tag   string
+	Regex *regexp.Regexp `json:"-"`
 }
 
 //说明：这7个字段都是必须指定
@@ -80,7 +80,7 @@ func checkConfig(config *Config) {
 	config.Prefix = strings.TrimSpace(config.Prefix)
 	config.Suffix = strings.TrimSpace(config.Suffix)
 	if config.Suffix == "" {
-		log.Println("suffix is no set, will use .log")
+		log.Println("INFO: suffix is no set, will use .log")
 		config.Suffix = ".log"
 	}
 
@@ -93,13 +93,12 @@ func checkConfig(config *Config) {
 
 	for _, v := range config.Keywords {
 		if v.Exp == "" || v.Tag == "" {
-			log.Fatal("keyword's exp and tag are requierd")
+			log.Fatal("ERROR: keyword's exp and tag are requierd")
 		}
 	}
 
-	// 检查正则表达式
-	config.Regs = make([]*regexp.Regexp, 0, 10)
-	for _, v := range config.Keywords {
-		config.Regs = append(config.Regs, regexp.MustCompile(v.Exp))
+	// 设置正则表达式
+	for i, v := range config.Keywords {
+		config.Keywords[i].Regex = regexp.MustCompile(v.Exp)
 	}
 }

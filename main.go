@@ -121,19 +121,14 @@ func getLogFile(cfg *config.Config) string {
 
 // 查找关键词
 func handleKeywords(line string, c *config.Config) {
-	for _, p := range c.Regs {
-		tags := ""
-		for _, foundStr := range p.FindAllString(line, -1) {
-			tags += p.String() + "=" + foundStr + ","
-		}
-
-		value := 1.0
-		if tags == "" {
-			value = 0.0
+	for _, p := range c.Keywords {
+		value := 0.0
+		if p.Regex.MatchString(line) {
+			value = 1.0
 		}
 
 		var data config.PushData
-		if v, ok := keywords.Get(p.String()); ok {
+		if v, ok := keywords.Get(p.Exp); ok {
 			d := v.(config.PushData)
 			d.Value += value
 			data = d
@@ -144,11 +139,11 @@ func handleKeywords(line string, c *config.Config) {
 				Value:       value,
 				Step:        c.Timer,
 				CounterType: "GAUGE",
-				Tags:        tags,
+				Tags:        p.Exp + "=" + p.Tag,
 			}
 		}
 
-		keywords.Set(p.String(), data)
+		keywords.Set(p.Exp, data)
 
 	}
 }
@@ -186,17 +181,23 @@ func postData(m cmap.ConcurrentMap, c *config.Config) {
 }
 
 func fillData(c *config.Config) {
-	for _, p := range c.Regs {
+	for _, p := range c.Keywords {
+
+		if _, ok := keywords.Get(p.Exp); ok {
+			continue
+		}
+
+		//不存在要插入一个补全
 		data := config.PushData{Metric: c.Metric,
 			Endpoint:    c.Host,
 			Timestamp:   time.Now().Unix(),
 			Value:       0.0,
 			Step:        c.Timer,
 			CounterType: "GAUGE",
-			Tags:        "",
+			Tags:        p.Exp + "=" + p.Tag,
 		}
 
-		keywords.Set(p.String(), data)
+		keywords.Set(p.Exp, data)
 	}
 
 }
