@@ -24,7 +24,7 @@ var (
 )
 
 func main() {
-	workers = make(chan bool, runtime.NumCPU()*2)
+	workers = make(chan bool, runtime.NumCPU() * 2)
 	keywords = cmap.New()
 	runtime.GOMAXPROCS(runtime.NumCPU())
 
@@ -61,7 +61,7 @@ func logFileWatcher(cfg *config.Config) {
 		for {
 			select {
 			case event := <-watcher.Events:
-				if event.Op&fsnotify.Create == fsnotify.Create {
+				if event.Op & fsnotify.Create == fsnotify.Create {
 					newLogfile := event.Name
 					log.Println("INFO: created file", event.Name)
 					if strings.HasSuffix(newLogfile, cfg.Suffix) && strings.HasPrefix(newLogfile, cfg.Prefix) {
@@ -125,9 +125,9 @@ func handleKeywords(line string, c *config.Config) {
 			tags += p.String() + "=" + foundStr + ","
 		}
 
-		value := 1
+		value := 1.0
 		if tags == "" {
-			0
+			value = 0.0
 		}
 
 		if v, ok := keywords.Get(p.String()); ok {
