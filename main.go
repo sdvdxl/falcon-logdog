@@ -35,12 +35,14 @@ func main() {
 	cfg := config.ReadConfig("cfg.json")
 
 	go func() {
-		ticker := time.NewTicker(time.Second * step)
+		ticker := time.NewTicker(time.Second * time.Duration(int64(cfg.Timer)))
 		for t := range ticker.C {
 			log.Println("INFO: time to push data: ", keywords.Items(), t)
 			postData(keywords, &cfg)
 		}
+	}()
 
+	go func() {
 		file := getLogFile(&cfg)
 		if file != "" {
 			logTail = readFile(file, &cfg)
@@ -140,7 +142,7 @@ func handleKeywords(line string, c *config.Config) {
 				Endpoint:    c.Host,
 				Timestamp:   time.Now().Unix(),
 				Value:       1,
-				Step:        step,
+				Step:        c.Timer,
 				CounterType: "GAUGE",
 				Tags:        tags,
 			}

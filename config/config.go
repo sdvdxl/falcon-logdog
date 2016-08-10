@@ -11,6 +11,7 @@ import (
 
 type Config struct {
 	Metric   string //度量名称,比如log.console 或者log
+	Timer    int    // 每隔多长时间（秒）上报
 	Host     string //主机名称
 	Path     string //路径
 	Prefix   string //log前缀
