@@ -54,7 +54,7 @@ func ReadConfig(configFile string) Config {
 
 	// 检查配置项目
 	checkConfig(&config)
-
+	log.Println("INFO: config init success, start to work ...")
 	return config
 }
 

@@ -23,6 +23,10 @@ var (
 	keywords cmap.ConcurrentMap
 )
 
+const (
+	step = 5
+)
+
 func main() {
 	workers = make(chan bool, runtime.NumCPU()*2)
 	keywords = cmap.New()
@@ -30,17 +34,19 @@ func main() {
 
 	cfg := config.ReadConfig("cfg.json")
 
-	ticker := time.NewTicker(time.Second * 5)
-	select {
-	case <-ticker.C:
-		log.Println("INFO: time to push data ", keywords.Items())
-		postData(keywords, &cfg)
-	}
+	go func() {
+		ticker := time.NewTicker(time.Second * step)
+		select {
+		case <-ticker.C:
+			log.Println("INFO: time to push data: ", keywords.Items())
+			postData(keywords, &cfg)
+		}
 
-	file := getLogFile(&cfg)
-	if file != "" {
-		logTail = readFile(file, &cfg)
-	}
+		file := getLogFile(&cfg)
+		if file != "" {
+			logTail = readFile(file, &cfg)
+		}
+	}()
 
 	logFileWatcher(&cfg)
 
@@ -60,10 +66,14 @@ func logFileWatcher(cfg *config.Config) {
 			case event := <-watcher.Events:
 				if event.Op&fsnotify.Create == fsnotify.Create {
 					newLogfile := event.Name
+					log.Println("INFO: created file", event.Name)
 					if strings.HasSuffix(newLogfile, cfg.Suffix) && strings.HasPrefix(newLogfile, cfg.Prefix) {
-						logTail.Stop()
+						if logTail != nil {
+							logTail.Stop()
+						}
+
 						logTail = readFile(event.Name, cfg)
-						log.Println("created file:", event.Name)
+
 					}
 				}
 			case err := <-watcher.Errors:
@@ -72,7 +82,7 @@ func logFileWatcher(cfg *config.Config) {
 		}
 	}()
 
-	err = watcher.Add("var")
+	err = watcher.Add(cfg.Path)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -107,8 +117,6 @@ func getLogFile(cfg *config.Config) string {
 		return err
 	})
 
-	log.Println("read log file:", result)
-
 	return result
 }
 
@@ -133,7 +141,7 @@ func handleKeywords(line string, c *config.Config) {
 				Endpoint:    c.Host,
 				Timestamp:   time.Now().Unix(),
 				Value:       1,
-				Step:        1,
+				Step:        step,
 				CounterType: "GAUGE",
 				Tags:        tags,
 			}
@@ -148,25 +156,27 @@ func postData(m cmap.ConcurrentMap, c *config.Config) {
 	workers <- true
 
 	go func() {
-		data := make([]config.PushData, 0, 20)
-		for k, v := range m.Items() {
-			data = append(data, v.(config.PushData))
-			m.Remove(k)
-		}
+		if len(m.Items()) != 0 {
+			data := make([]config.PushData, 0, 20)
+			for k, v := range m.Items() {
+				data = append(data, v.(config.PushData))
+				m.Remove(k)
+			}
 
-		bytes, err := json.Marshal(data)
-		if err != nil {
-			log.Println("ERROR : marshal push data", data, err)
-			return
-		}
+			bytes, err := json.Marshal(data)
+			if err != nil {
+				log.Println("ERROR : marshal push data", data, err)
+				return
+			}
 
-		resp, err := http.Post(c.Agent, "plain/text", strings.NewReader(string(bytes)))
-		if err != nil {
-			log.Println("ERROR: post data ", string(bytes), " to agent ", err)
-		} else {
-			defer resp.Body.Close()
-			bytes, _ = ioutil.ReadAll(resp.Body)
-			fmt.Println(bytes)
+			resp, err := http.Post(c.Agent, "plain/text", strings.NewReader(string(bytes)))
+			if err != nil {
+				log.Println("ERROR: post data ", string(bytes), " to agent ", err)
+			} else {
+				defer resp.Body.Close()
+				bytes, _ = ioutil.ReadAll(resp.Body)
+				fmt.Println(bytes)
+			}
 		}
 
 		<-workers
