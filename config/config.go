@@ -23,6 +23,8 @@ func init() {
 }
 
 type Config struct {
+	Metric   string //度量名称,比如log.console 或者log
+	Host     string //主机名称
 	Path     string //路径
 	Prefix   string //log前缀
 	Suffix   string //log后缀
@@ -44,7 +46,7 @@ type PushData struct {
 	CounterType string `json:"counterType"` //只能是COUNTER或者GAUGE二选一，前者表示该数据采集项为计时器类型，后者表示其为原值 (注意大小写)
 	//GAUGE：即用户上传什么样的值，就原封不动的存储
 	//COUNTER：指标在存储和展现的时候，会被计算为speed，即（当前值 - 上次值）/ 时间间隔
-	Tags string `tags` //一组逗号分割的键值对, 对metric进一步描述和细化, 可以是空字符串. 比如idc=lg，比如service=xbox等，多个tag之间用逗号分割
+	Tags string `json:"tags"` //一组逗号分割的键值对, 对metric进一步描述和细化, 可以是空字符串. 比如idc=lg，比如service=xbox等，多个tag之间用逗号分割
 }
 
 func ReadConfig(configFile string) Config {
