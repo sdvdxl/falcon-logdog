@@ -24,7 +24,7 @@ var (
 )
 
 func main() {
-	workers = make(chan bool, runtime.NumCPU() * 2)
+	workers = make(chan bool, runtime.NumCPU()*2)
 	keywords = cmap.New()
 	runtime.GOMAXPROCS(runtime.NumCPU())
 
@@ -33,6 +33,8 @@ func main() {
 	go func() {
 		ticker := time.NewTicker(time.Second * time.Duration(int64(cfg.Timer)))
 		for t := range ticker.C {
+			fillData(&cfg)
+
 			log.Println("INFO: time to push data: ", keywords.Items(), t)
 			postData(keywords, &cfg)
 		}
@@ -61,7 +63,7 @@ func logFileWatcher(cfg *config.Config) {
 		for {
 			select {
 			case event := <-watcher.Events:
-				if event.Op & fsnotify.Create == fsnotify.Create {
+				if event.Op&fsnotify.Create == fsnotify.Create {
 					newLogfile := event.Name
 					log.Println("INFO: created file", event.Name)
 					if strings.HasSuffix(newLogfile, cfg.Suffix) && strings.HasPrefix(newLogfile, cfg.Prefix) {
@@ -130,12 +132,13 @@ func handleKeywords(line string, c *config.Config) {
 			value = 0.0
 		}
 
+		var data config.PushData
 		if v, ok := keywords.Get(p.String()); ok {
 			d := v.(config.PushData)
 			d.Value += value
-			keywords.Set(p.String(), d)
+			data = d
 		} else {
-			d := config.PushData{Metric: c.Metric,
+			data = config.PushData{Metric: c.Metric,
 				Endpoint:    c.Host,
 				Timestamp:   time.Now().Unix(),
 				Value:       value,
@@ -143,9 +146,9 @@ func handleKeywords(line string, c *config.Config) {
 				CounterType: "GAUGE",
 				Tags:        tags,
 			}
-			keywords.Set(p.String(), d)
-
 		}
+
+		keywords.Set(p.String(), data)
 
 	}
 }
@@ -179,5 +182,21 @@ func postData(m cmap.ConcurrentMap, c *config.Config) {
 
 		<-workers
 	}()
+
+}
+
+func fillData(c *config.Config) {
+	for _, p := range c.Regs {
+		data := config.PushData{Metric: c.Metric,
+			Endpoint:    c.Host,
+			Timestamp:   time.Now().Unix(),
+			Value:       0.0,
+			Step:        c.Timer,
+			CounterType: "GAUGE",
+			Tags:        "",
+		}
+
+		keywords.Set(p.String(), data)
+	}
 
 }
