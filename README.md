@@ -17,7 +17,14 @@ agent | 无 | 是 | agent api url，比如 http://localhost:1988/v1/push
 host | 无 | 是 | 主机名字，根据hostname设定，不要使用localhost，可能导致查询不到数据
 prefix | 空字符串 | 否 | 要监控的日志文件名字前缀
 suffix | .log | 否 | 要监控的日志文件后缀，如果不填则用默认值
-keywords | 无 | 是 | 是个 **正则表达式** 数组
+keywords | 无 | 是 | 是 keyword对象数组
+
+keyword 对象说明
+
+名字 | 默认值 | 必填 | 说明
+---- | ----|----|----
+exp | 无 | 是 | 正则表达式
+tag|无|是| 对应于监控中tag的值
 
 ## 上报数据
 格式如下：
@@ -30,10 +37,10 @@ keywords | 无 | 是 | 是个 **正则表达式** 数组
 	"value":5,
 	"step":60,
 	"counterType":"GAUGE",
-	"tags":"key2=key2"
+	"tags":"exp=tag"
 ```
 
-其中，tags 格式为 `keywords` 中 '正则表达式字符串' + '=' + '匹配的值'
+其中，tags 格式为 `keywords` 中 正则表达式'exp' + '=' + 'tag'
 
 ## 启动脚本
 使用 `control` 脚本来操作:
@@ -56,5 +63,5 @@ option 可以为
 如果有数据要push上去，那么可能会观察到有如下日志产生：
 
 ```
-time to push data:  map[key2:{log 10-10-128-53 1470827020 5 60 GAUGE key2=key2,} key1:{log 10-10-128-53 1470827020 5 60 GAUGE key1=key1,}] 2016-08-10 19:04:40.850295266 +0800 CST
+time to push data:  map[key2:{log 10-10-128-53 1470827020 5 60 GAUGE key2=tag2,} key1:{log 10-10-128-53 1470827020 5 60 GAUGE key1=tag,}] 2016-08-10 19:04:40.850295266 +0800 CST
 ```
