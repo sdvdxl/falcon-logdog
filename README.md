@@ -38,6 +38,7 @@ tag|无|是| 对应于监控中tag的值
 	"step":60,
 	"counterType":"GAUGE",
 	"tags":"exp=tag"
+}
 ```
 
 其中，tags 格式为 `keywords` 中 正则表达式'exp' + '=' + 'tag'
