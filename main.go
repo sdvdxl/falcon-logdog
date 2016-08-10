@@ -150,7 +150,6 @@ func postData(m cmap.ConcurrentMap, c *config.Config) {
 	go func() {
 		data := make([]config.PushData, 0, 20)
 		for k, v := range m.Items() {
-			fmt.Println(m.Items())
 			data = append(data, v.(config.PushData))
 			m.Remove(k)
 		}
