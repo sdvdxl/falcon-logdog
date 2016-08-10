@@ -1,0 +1,11 @@
+{
+  "agent": "http://10.10.128.53:1988/v1/push",
+  "host": "",
+  "path": ".",
+  "prefix": "",
+  "suffix": "",
+  "keywords": [
+    "key1",
+    "key2"
+  ]
+}
