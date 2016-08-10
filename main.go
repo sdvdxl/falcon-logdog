@@ -23,10 +23,6 @@ var (
 	keywords cmap.ConcurrentMap
 )
 
-const (
-	step = 5
-)
-
 func main() {
 	workers = make(chan bool, runtime.NumCPU()*2)
 	keywords = cmap.New()
@@ -129,19 +125,20 @@ func handleKeywords(line string, c *config.Config) {
 			tags += p.String() + "=" + foundStr + ","
 		}
 
+		value := 1
 		if tags == "" {
-			continue
+			0
 		}
 
 		if v, ok := keywords.Get(p.String()); ok {
 			d := v.(config.PushData)
-			d.Value += 1
+			d.Value += value
 			keywords.Set(p.String(), d)
 		} else {
 			d := config.PushData{Metric: c.Metric,
 				Endpoint:    c.Host,
 				Timestamp:   time.Now().Unix(),
-				Value:       1,
+				Value:       value,
 				Step:        c.Timer,
 				CounterType: "GAUGE",
 				Tags:        tags,
