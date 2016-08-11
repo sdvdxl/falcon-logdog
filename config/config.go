@@ -12,14 +12,15 @@ import (
 )
 
 type Config struct {
-	Metric   string //度量名称,比如log.console 或者log
-	Timer    int    // 每隔多长时间（秒）上报
-	Host     string //主机名称
-	Path     string //路径
-	Prefix   string //log前缀
-	Suffix   string //log后缀
-	Agent    string //agent api url
-	Keywords []keyWord
+	Metric     string //度量名称,比如log.console 或者log
+	Timer      int    // 每隔多长时间（秒）上报
+	Host       string //主机名称
+	Path       string //路径
+	Prefix     string //log前缀
+	Suffix     string //log后缀
+	Agent      string //agent api url
+	Keywords   []keyWord
+	PathIsFile bool //path 是否是文件
 }
 
 type keyWord struct {
@@ -49,6 +50,7 @@ const configFile = "cfg.json"
 var Cfg *Config
 
 func init() {
+	log.SetFlags(log.Ldate | log.Lshortfile)
 	var err error
 	Cfg, err = ReadConfig(configFile)
 	if err != nil {
@@ -64,12 +66,7 @@ func init() {
 }
 
 func ReadConfig(configFile string) (*Config, error) {
-	f, err := os.Open(configFile)
-	if err != nil {
-		return nil, err
-	}
-	defer f.Close()
-	bytes, err := ioutil.ReadAll(f)
+	bytes, err := ioutil.ReadFile(configFile)
 	if err != nil {
 		return nil, err
 	}
@@ -97,7 +94,7 @@ func checkConfig(config *Config) error {
 	}
 
 	if !fInfo.IsDir() {
-		return errors.New("config path should be dir, not a file")
+		config.PathIsFile = true
 	}
 
 	//检查后缀,如果没有,则默认为.log

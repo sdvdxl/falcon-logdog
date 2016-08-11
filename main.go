@@ -49,11 +49,11 @@ func main() {
 
 }
 func logFileWatcher() {
+	c := config.Cfg
 	watcher, err := fsnotify.NewWatcher()
 	if err != nil {
-		log.Fatal(err)
+		log.Fatal("ERROR:", err)
 	}
-
 	defer watcher.Close()
 
 	done := make(chan bool)
@@ -61,27 +61,38 @@ func logFileWatcher() {
 		for {
 			select {
 			case event := <-watcher.Events:
-				if event.Op&fsnotify.Create == fsnotify.Create {
-					newLogfile := event.Name
-					log.Println("INFO: created file", event.Name)
-					if strings.HasSuffix(newLogfile, config.Cfg.Suffix) && strings.HasPrefix(newLogfile, config.Cfg.Prefix) {
-						if logTail != nil {
-							logTail.Stop()
+				if c.PathIsFile && event.Op == fsnotify.Create && event.Name == c.Path {
+					log.Println("INFO: continue to watch file:", event.Name)
+					if logTail != nil {
+						logTail.Stop()
+					}
+
+					logTail = readFile(c.Path)
+				} else {
+					if event.Op == fsnotify.Create {
+						newLogfile := event.Name
+						log.Println("INFO: created file", event.Name)
+						if strings.HasSuffix(newLogfile, config.Cfg.Suffix) && strings.HasPrefix(newLogfile, config.Cfg.Prefix) {
+							if logTail != nil {
+								logTail.Stop()
+							}
+
+							logTail = readFile(event.Name)
+
 						}
-
-						logTail = readFile(event.Name)
-
 					}
 				}
+
 			case err := <-watcher.Errors:
-				log.Println("error:", err)
+				log.Println("ERROR:", err)
 			}
 		}
 	}()
 
-	err = watcher.Add(config.Cfg.Path)
+	err = watcher.Add(filepath.Dir(c.Path))
 	if err != nil {
-		log.Fatal(err)
+		log.Fatal("ERROR:", err)
+
 	}
 	<-done
 }
@@ -91,7 +102,7 @@ func readFile(filename string) *tail.Tail {
 	log.Println("INFO: read file", filename)
 	tail, err := tail.TailFile(filename, tail.Config{Follow: true})
 	if err != nil {
-		log.Fatal(err)
+		log.Fatal("ERROR:", err)
 	}
 
 	go func() {
@@ -104,8 +115,14 @@ func readFile(filename string) *tail.Tail {
 }
 
 func getLogFile() string {
+	c := config.Cfg
 	result := ""
-	filepath.Walk(config.Cfg.Path, func(path string, info os.FileInfo, err error) error {
+
+	if config.Cfg.PathIsFile {
+		return c.Path
+	}
+
+	filepath.Walk(c.Path, func(path string, info os.FileInfo, err error) error {
 		cfgPath := config.Cfg.Path
 		if strings.HasSuffix(cfgPath, "/") {
 			cfgPath = string([]rune(cfgPath)[:len(cfgPath)-1])

@@ -3,7 +3,7 @@
   "timer": 60,
   "agent": "http://10.10.128.53:1988/v1/push",
   "host": "10-10-128-53",
-  "path": "/data/logs/test/",
+  "path": "/data/logs/test/a.log",
   "prefix": "",
   "suffix": "",
   "keywords": [
