@@ -54,7 +54,7 @@ var (
 )
 
 func init() {
-	log.SetFlags(log.Ldate | log.Lshortfile)
+	log.SetFlags(log.LUTC | log.Lshortfile)
 	var err error
 	Cfg, err = ReadConfig(configFile)
 	if err != nil {
