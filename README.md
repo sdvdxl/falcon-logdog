@@ -45,7 +45,7 @@ tag|无|是| 对应于监控中tag的key
 }
 ```
 
-其中，tags 格式为 `keywords` 中 'tag' + '=' + 'exp'
+其中，tags 格式为 `keywords` 中 'tag' + '=' + 'FixedExp', `FixedExp` 是用`.`替换 `exp` 之后的并将`.`去重字符串。
 
 ## 启动脚本
 使用 `control` 脚本来操作:
