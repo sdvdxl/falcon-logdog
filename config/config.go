@@ -2,6 +2,8 @@ package config
 
 import (
 	"encoding/json"
+	"github.com/fsnotify/fsnotify"
+	"github.com/go-errors/errors"
 	"io/ioutil"
 	"log"
 	"os"
@@ -42,38 +44,60 @@ type PushData struct {
 	Tags string `json:"tags"` //一组逗号分割的键值对, 对metric进一步描述和细化, 可以是空字符串. 比如idc=lg，比如service=xbox等，多个tag之间用逗号分割
 }
 
-func ReadConfig(configFile string) Config {
+const configFile = "cfg.json"
+
+var Cfg *Config
+
+func init() {
+	var err error
+	Cfg, err = ReadConfig(configFile)
+	if err != nil {
+		log.Fatal("ERROR: ", err)
+	}
+	if err = checkConfig(Cfg); err != nil {
+		log.Fatal(err)
+	}
+
+	go func() {
+		ConfigFileWatcher()
+	}()
+}
+
+func ReadConfig(configFile string) (*Config, error) {
 	f, err := os.Open(configFile)
 	if err != nil {
-		log.Fatal(err)
+		return nil, err
 	}
 	defer f.Close()
 	bytes, err := ioutil.ReadAll(f)
 	if err != nil {
-		log.Fatal(err)
+		return nil, err
 	}
 
-	var config Config
+	var config *Config
 	if err := json.Unmarshal(bytes, &config); err != nil {
-		log.Fatal("cfg.json has error", err)
+		return nil, err
 	}
 
 	// 检查配置项目
-	checkConfig(&config)
+	if err := checkConfig(config); err != nil {
+		return nil, err
+	}
+
 	log.Println("INFO: config init success, start to work ...")
-	return config
+	return config, nil
 }
 
 // 检查配置项目是否正确
-func checkConfig(config *Config) {
+func checkConfig(config *Config) error {
 	//检查路径
 	fInfo, err := os.Stat(config.Path)
 	if err != nil {
-		log.Fatal(err)
+		return err
 	}
 
 	if !fInfo.IsDir() {
-		log.Fatal("path should be dir, not a file")
+		return errors.New("config path should be dir, not a file")
 	}
 
 	//检查后缀,如果没有,则默认为.log
@@ -88,17 +112,62 @@ func checkConfig(config *Config) {
 
 	//检查keywords
 	if len(config.Keywords) == 0 {
-		log.Fatal("keyword list not set")
+		return errors.New("ERROR: keyword list not set")
 	}
 
 	for _, v := range config.Keywords {
 		if v.Exp == "" || v.Tag == "" {
-			log.Fatal("ERROR: keyword's exp and tag are requierd")
+			return errors.New("ERROR: keyword's exp and tag are requierd")
 		}
 	}
 
 	// 设置正则表达式
 	for i, v := range config.Keywords {
-		config.Keywords[i].Regex = regexp.MustCompile(v.Exp)
+
+		if config.Keywords[i].Regex, err = regexp.Compile(v.Exp); err != nil {
+			return err
+		}
 	}
+
+	return nil
+}
+
+//配置文件监控,可以实现热更新
+func ConfigFileWatcher() {
+	watcher, err := fsnotify.NewWatcher()
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	defer watcher.Close()
+
+	done := make(chan bool)
+	go func() {
+		for {
+			select {
+			case event := <-watcher.Events:
+				log.Println(event)
+				if event.Op == fsnotify.Chmod || event.Op == fsnotify.Rename || event.Op == fsnotify.Write {
+					log.Println("INFO: modified config file", event.Name, "will reaload config")
+					if cfg, err := ReadConfig(configFile); err != nil {
+						log.Println("ERROR: config has error, will not use old config", err)
+					} else if checkConfig(Cfg) != nil {
+						log.Println("ERROR: config has error, will not use old config", err)
+					} else {
+						log.Println("INFO: config reload success")
+						Cfg = cfg
+					}
+
+				}
+			case err := <-watcher.Errors:
+				log.Println("error:", err)
+			}
+		}
+	}()
+
+	err = watcher.Add(configFile)
+	if err != nil {
+		log.Fatal(err)
+	}
+	<-done
 }

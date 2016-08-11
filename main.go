@@ -28,29 +28,27 @@ func main() {
 	keywords = cmap.New()
 	runtime.GOMAXPROCS(runtime.NumCPU())
 
-	cfg := config.ReadConfig("cfg.json")
-
 	go func() {
-		ticker := time.NewTicker(time.Second * time.Duration(int64(cfg.Timer)))
+		ticker := time.NewTicker(time.Second * time.Duration(int64(config.Cfg.Timer)))
 		for t := range ticker.C {
-			fillData(&cfg)
+			fillData()
 
 			log.Println("INFO: time to push data: ", keywords.Items(), t)
-			postData(keywords, &cfg)
+			postData(keywords)
 		}
 	}()
 
 	go func() {
-		file := getLogFile(&cfg)
+		file := getLogFile()
 		if file != "" {
-			logTail = readFile(file, &cfg)
+			logTail = readFile(file)
 		}
 	}()
 
-	logFileWatcher(&cfg)
+	logFileWatcher()
 
 }
-func logFileWatcher(cfg *config.Config) {
+func logFileWatcher() {
 	watcher, err := fsnotify.NewWatcher()
 	if err != nil {
 		log.Fatal(err)
@@ -66,12 +64,12 @@ func logFileWatcher(cfg *config.Config) {
 				if event.Op&fsnotify.Create == fsnotify.Create {
 					newLogfile := event.Name
 					log.Println("INFO: created file", event.Name)
-					if strings.HasSuffix(newLogfile, cfg.Suffix) && strings.HasPrefix(newLogfile, cfg.Prefix) {
+					if strings.HasSuffix(newLogfile, config.Cfg.Suffix) && strings.HasPrefix(newLogfile, config.Cfg.Prefix) {
 						if logTail != nil {
 							logTail.Stop()
 						}
 
-						logTail = readFile(event.Name, cfg)
+						logTail = readFile(event.Name)
 
 					}
 				}
@@ -81,14 +79,14 @@ func logFileWatcher(cfg *config.Config) {
 		}
 	}()
 
-	err = watcher.Add(cfg.Path)
+	err = watcher.Add(config.Cfg.Path)
 	if err != nil {
 		log.Fatal(err)
 	}
 	<-done
 }
 
-func readFile(filename string, c *config.Config) *tail.Tail {
+func readFile(filename string) *tail.Tail {
 
 	log.Println("INFO: read file", filename)
 	tail, err := tail.TailFile(filename, tail.Config{Follow: true})
@@ -98,17 +96,17 @@ func readFile(filename string, c *config.Config) *tail.Tail {
 
 	go func() {
 		for line := range tail.Lines {
-			handleKeywords(line.Text, c)
+			handleKeywords(line.Text)
 		}
 	}()
 
 	return tail
 }
 
-func getLogFile(cfg *config.Config) string {
+func getLogFile() string {
 	result := ""
-	filepath.Walk(cfg.Path, func(path string, info os.FileInfo, err error) error {
-		if strings.HasPrefix(path, cfg.Prefix) && strings.HasSuffix(path, cfg.Suffix) && !info.IsDir() {
+	filepath.Walk(config.Cfg.Path, func(path string, info os.FileInfo, err error) error {
+		if strings.HasPrefix(path, config.Cfg.Prefix) && strings.HasSuffix(path, config.Cfg.Suffix) && !info.IsDir() {
 			result = path
 			return nil
 		}
@@ -120,7 +118,8 @@ func getLogFile(cfg *config.Config) string {
 }
 
 // 查找关键词
-func handleKeywords(line string, c *config.Config) {
+func handleKeywords(line string) {
+	c := config.Cfg
 	for _, p := range c.Keywords {
 		value := 0.0
 		if p.Regex.MatchString(line) {
@@ -148,7 +147,8 @@ func handleKeywords(line string, c *config.Config) {
 	}
 }
 
-func postData(m cmap.ConcurrentMap, c *config.Config) {
+func postData(m cmap.ConcurrentMap) {
+	c := config.Cfg
 	workers <- true
 
 	go func() {
@@ -180,7 +180,8 @@ func postData(m cmap.ConcurrentMap, c *config.Config) {
 
 }
 
-func fillData(c *config.Config) {
+func fillData() {
+	c := config.Cfg
 	for _, p := range c.Keywords {
 
 		if _, ok := keywords.Get(p.Exp); ok {
