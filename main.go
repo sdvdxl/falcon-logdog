@@ -106,9 +106,20 @@ func readFile(filename string) *tail.Tail {
 func getLogFile() string {
 	result := ""
 	filepath.Walk(config.Cfg.Path, func(path string, info os.FileInfo, err error) error {
+		cfgPath := config.Cfg.Path
+		if strings.HasSuffix(cfgPath, "/") {
+			cfgPath = string([]rune(cfgPath)[:len(cfgPath)-1])
+		}
+
+		//只读取root目录的log
+		if filepath.Dir(path) != cfgPath {
+			log.Println("DEBUG: ", path, "not in root path, ignoring , Dir:", filepath.Dir(path), "cofig path:", cfgPath)
+			return err
+		}
+
 		if strings.HasPrefix(path, config.Cfg.Prefix) && strings.HasSuffix(path, config.Cfg.Suffix) && !info.IsDir() {
 			result = path
-			return nil
+			return err
 		}
 
 		return err
