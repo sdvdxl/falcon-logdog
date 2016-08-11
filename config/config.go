@@ -24,9 +24,10 @@ type Config struct {
 }
 
 type keyWord struct {
-	Exp   string
-	Tag   string
-	Regex *regexp.Regexp `json:"-"`
+	Exp      string
+	Tag      string
+	FixedExp string         `json:"-"` //替换
+	Regex    *regexp.Regexp `json:"-"`
 }
 
 //说明：这7个字段都是必须指定
@@ -47,7 +48,10 @@ type PushData struct {
 
 const configFile = "cfg.json"
 
-var Cfg *Config
+var (
+	Cfg         *Config
+	fixExpRegex = regexp.MustCompile(`[\W]+`)
+)
 
 func init() {
 	log.SetFlags(log.Ldate | log.Lshortfile)
@@ -124,6 +128,8 @@ func checkConfig(config *Config) error {
 		if config.Keywords[i].Regex, err = regexp.Compile(v.Exp); err != nil {
 			return err
 		}
+
+		config.Keywords[i].FixedExp = string(fixExpRegex.ReplaceAll([]byte(v.Exp), []byte(".")))
 	}
 
 	return nil
