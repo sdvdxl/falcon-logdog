@@ -166,7 +166,7 @@ func handleKeywords(line string) {
 				Value:       value,
 				Step:        c.Timer,
 				CounterType: "GAUGE",
-				Tags:        p.Exp + "=" + p.Tag,
+				Tags:        p.Tag + "=" + p.Exp,
 			}
 		}
 
@@ -223,7 +223,7 @@ func fillData() {
 			Value:       0.0,
 			Step:        c.Timer,
 			CounterType: "GAUGE",
-			Tags:        p.Exp + "=" + p.Tag,
+			Tags:        p.Tag + "=" + p.Exp,
 		}
 
 		keywords.Set(p.Exp, data)

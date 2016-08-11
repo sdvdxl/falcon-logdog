@@ -23,8 +23,8 @@ keyword 对象说明
 
 名字 | 默认值 | 必填 | 说明
 ---- | ----|----|----
-exp | 无 | 是 | 正则表达式
-tag|无|是| 对应于监控中tag的值
+exp | 无 | 是 | 正则表达式,tag的value
+tag|无|是| 对应于监控中tag的key
 
 ### 配置热更新
 
@@ -41,11 +41,11 @@ tag|无|是| 对应于监控中tag的值
 	"value":5,
 	"step":60,
 	"counterType":"GAUGE",
-	"tags":"exp=tag"
+	"tags":"tag=exp"
 }
 ```
 
-其中，tags 格式为 `keywords` 中 正则表达式'exp' + '=' + 'tag'
+其中，tags 格式为 `keywords` 中 'tag' + '=' + 'exp'
 
 ## 启动脚本
 使用 `control` 脚本来操作:
