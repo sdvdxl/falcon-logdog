@@ -149,7 +149,6 @@ func ConfigFileWatcher() {
 		for {
 			select {
 			case event := <-watcher.Events:
-				log.Println(event)
 				if event.Op == fsnotify.Chmod || event.Op == fsnotify.Rename || event.Op == fsnotify.Write {
 					log.Println("INFO: modified config file", event.Name, "will reaload config")
 					if cfg, err := ReadConfig(configFile); err != nil {
