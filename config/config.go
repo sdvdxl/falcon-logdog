@@ -101,6 +101,16 @@ func checkConfig(config *Config) error {
 		config.PathIsFile = true
 	}
 
+	//检查 host
+	if config.Host == "" {
+		if config.Host, err = os.Hostname(); err != nil {
+			return err
+		}
+
+		log.Println("INFO: host not set will use system's name:", config.Host)
+
+	}
+
 	//检查后缀,如果没有,则默认为.log
 	config.Prefix = strings.TrimSpace(config.Prefix)
 	config.Suffix = strings.TrimSpace(config.Suffix)
