@@ -14,7 +14,7 @@ metric | 无 | 是 | 统计度量，比如叫做 log
 path | 无 | 是 | 要监控的日志目录或者文件,如果是目录则会寻找其中一个匹配的日志文件,如果是文件,则会直接监控这个文件,但是不管如何,启动程序时候路径都要存在
 timer | 无 | 是 | 要同步数据间隔时间和上报数据的step值，api接口貌似最小30，保持 60为好
 agent | 无 | 是 | agent api url，比如 http://localhost:1988/v1/push
-host | 无 | 是 | 主机名字，根据hostname设定，不要使用localhost，可能导致查询不到数据
+host | hostname 命令查看的值 | 否 | 主机名字，根据hostname设定，不要使用localhost，可能导致查询不到数据
 prefix | 空字符串 | 否 | 要监控的日志文件名字前缀
 suffix | .log | 否 | 要监控的日志文件后缀，如果不填则用默认值
 keywords | 无 | 是 | 是 keyword对象数组
