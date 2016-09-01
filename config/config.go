@@ -2,6 +2,7 @@ package config
 
 import (
 	"encoding/json"
+	"fmt"
 	"github.com/fsnotify/fsnotify"
 	"github.com/go-errors/errors"
 	"github.com/hpcloud/tail"
@@ -80,6 +81,8 @@ func init() {
 	go func() {
 		ConfigFileWatcher()
 	}()
+
+	fmt.Println("INFO: config:", Cfg)
 }
 
 func ReadConfig(configFile string) (*Config, error) {

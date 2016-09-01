@@ -5,7 +5,7 @@
   "host": "10-10-128-53",
   "files": [
     {
-      "path": "/data/logs/test/a.log",
+      "path": "/data/logs/test",
       "prefix": "aaa",
       "suffix": ".log",
       "keywords": [
@@ -16,7 +16,7 @@
       ]
     },
     {
-      "path": "/data/logs/test/b.log",
+      "path": "/data/logs/test",
       "prefix": "bbb",
       "suffix": ".log",
       "keywords": [

@@ -45,7 +45,6 @@ func main() {
 		log.Println("INFO: watch file ", config.Cfg.WatchFiles)
 
 		for i := 0; i < len(config.Cfg.WatchFiles); i++ {
-			fmt.Println(i)
 			readFileAndSetTail(&(config.Cfg.WatchFiles[i]))
 			go logFileWatcher(&(config.Cfg.WatchFiles[i]))
 
@@ -134,14 +133,17 @@ func setLogFile() {
 			if strings.HasSuffix(cfgPath, "/") {
 				cfgPath = string([]rune(cfgPath)[:len(cfgPath)-1])
 			}
+			log.Println(path)
 
 			//只读取root目录的log
-			if filepath.Dir(path) != cfgPath {
-				log.Println("DEBUG: ", path, "not in root path, ignoring , Dir:", filepath.Dir(path), "cofig path:", cfgPath)
+			if filepath.Dir(path) != cfgPath && info.IsDir() {
+				log.Println("DEBUG: ", path, "not in root path, ignoring , Dir:", path, "cofig path:", cfgPath)
 				return err
 			}
 
-			if strings.HasPrefix(path, v.Prefix) && strings.HasSuffix(path, v.Suffix) && !info.IsDir() {
+			log.Println("DEBUG: path", path, "prefix:", v.Prefix, "suffix:", v.Suffix, "base:", filepath.Base(path), "isFile", !info.IsDir())
+			if strings.HasPrefix(filepath.Base(path), v.Prefix) && strings.HasSuffix(path, v.Suffix) && !info.IsDir() {
+
 				if c.WatchFiles[i].ResultFile.FileName == "" || info.ModTime().After(c.WatchFiles[i].ResultFile.ModTime) {
 					c.WatchFiles[i].ResultFile.FileName = path
 					c.WatchFiles[i].ResultFile.ModTime = info.ModTime()
@@ -151,8 +153,8 @@ func setLogFile() {
 
 			return err
 		})
-	}
 
+	}
 }
 
 // 查找关键词
