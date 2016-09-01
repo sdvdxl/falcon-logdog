@@ -2,7 +2,6 @@ package main
 
 import (
 	"encoding/json"
-	"fmt"
 	"github.com/fsnotify/fsnotify"
 	"github.com/hpcloud/tail"
 	"github.com/sdvdxl/falcon-logdog/config"
@@ -31,11 +30,11 @@ func main() {
 
 	go func() {
 		ticker := time.NewTicker(time.Second * time.Duration(int64(config.Cfg.Timer)))
-		for t := range ticker.C {
+		for range ticker.C {
 			fillData()
 
-			log.Println("INFO: time to push data: ", keywords.Items(), t)
-			postData(keywords)
+			//log.Println("INFO: time to push data: ")
+			postData()
 		}
 	}()
 
@@ -186,16 +185,16 @@ func handleKeywords(file config.WatchFile, line string) {
 	}
 }
 
-func postData(m cmap.ConcurrentMap) {
+func postData() {
 	c := config.Cfg
 	workers <- true
 
 	go func() {
-		if len(m.Items()) != 0 {
+		if len(keywords.Items()) != 0 {
 			data := make([]config.PushData, 0, 20)
-			for k, v := range m.Items() {
+			for k, v := range keywords.Items() {
 				data = append(data, v.(config.PushData))
-				m.Remove(k)
+				keywords.Remove(k)
 			}
 
 			bytes, err := json.Marshal(data)
@@ -204,13 +203,15 @@ func postData(m cmap.ConcurrentMap) {
 				return
 			}
 
+			//log.Println("INFO: pushing data:", string(bytes))
+
 			resp, err := http.Post(c.Agent, "plain/text", strings.NewReader(string(bytes)))
 			if err != nil {
 				log.Println("ERROR: post data ", string(bytes), " to agent ", err)
 			} else {
 				defer resp.Body.Close()
 				bytes, _ = ioutil.ReadAll(resp.Body)
-				fmt.Println("INFO:", string(bytes))
+				log.Println("INFO:", string(bytes))
 			}
 		}
 
@@ -224,7 +225,10 @@ func fillData() {
 	for _, v := range c.WatchFiles {
 		for _, p := range v.Keywords {
 
-			if _, ok := keywords.Get(p.Exp); ok {
+			key := v.ResultFile.FileName + p.Tag
+			log.Println("_______", key)
+
+			if _, ok := keywords.Get(key); ok {
 				continue
 			}
 
@@ -238,7 +242,7 @@ func fillData() {
 				Tags:        "prefix=" + v.Prefix + ",suffix=" + v.Suffix + "," + p.Tag + "=" + p.FixedExp,
 			}
 
-			keywords.Set(v.ResultFile.FileName+p.Tag, data)
+			keywords.Set(key, data)
 		}
 	}
 
