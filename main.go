@@ -11,6 +11,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"path"
 	"path/filepath"
 	"runtime"
 	"strings"
@@ -39,17 +40,23 @@ func main() {
 	}()
 
 	go func() {
-		file := getLogFile()
-		if file != "" {
-			logTail = readFile(file)
+		setLogFile()
+
+		log.Println("INFO: watch file ", config.Cfg.WatchFiles)
+
+		for i := 0; i < len(config.Cfg.WatchFiles); i++ {
+			fmt.Println(i)
+			readFileAndSetTail(&(config.Cfg.WatchFiles[i]))
+			go logFileWatcher(&(config.Cfg.WatchFiles[i]))
+
 		}
+
 	}()
 
-	logFileWatcher()
-
+	run := make(chan bool)
+	<-run
 }
-func logFileWatcher() {
-	c := config.Cfg
+func logFileWatcher(file *config.WatchFile) {
 	watcher, err := fsnotify.NewWatcher()
 	if err != nil {
 		log.Fatal("ERROR:", err)
@@ -57,27 +64,27 @@ func logFileWatcher() {
 	defer watcher.Close()
 
 	done := make(chan bool)
+
 	go func() {
 		for {
 			select {
 			case event := <-watcher.Events:
-				if c.PathIsFile && event.Op == fsnotify.Create && event.Name == c.Path {
+				if file.PathIsFile && event.Op == fsnotify.Create && event.Name == file.Path {
 					log.Println("INFO: continue to watch file:", event.Name)
 					if logTail != nil {
 						logTail.Stop()
 					}
 
-					logTail = readFile(c.Path)
+					readFileAndSetTail(file)
 				} else {
 					if event.Op == fsnotify.Create {
-						newLogfile := event.Name
-						log.Println("INFO: created file", event.Name)
-						if strings.HasSuffix(newLogfile, config.Cfg.Suffix) && strings.HasPrefix(newLogfile, config.Cfg.Prefix) {
+						log.Println("INFO: created file", event.Name, path.Base(event.Name))
+						if strings.HasSuffix(event.Name, file.Suffix) && strings.HasPrefix(path.Base(event.Name), file.Prefix) {
 							if logTail != nil {
 								logTail.Stop()
 							}
-
-							logTail = readFile(event.Name)
+							file.ResultFile.FileName = event.Name
+							readFileAndSetTail(file)
 
 						}
 					}
@@ -89,7 +96,7 @@ func logFileWatcher() {
 		}
 	}()
 
-	err = watcher.Add(filepath.Dir(c.Path))
+	err = watcher.Add(filepath.Dir(file.Path))
 	if err != nil {
 		log.Fatal("ERROR:", err)
 
@@ -97,58 +104,60 @@ func logFileWatcher() {
 	<-done
 }
 
-func readFile(filename string) *tail.Tail {
-
-	log.Println("INFO: read file", filename)
-	tail, err := tail.TailFile(filename, tail.Config{Follow: true})
+func readFileAndSetTail(file *config.WatchFile) {
+	log.Println("INFO: read file", file.ResultFile.FileName)
+	tail, err := tail.TailFile(file.ResultFile.FileName, tail.Config{Follow: true})
 	if err != nil {
 		log.Fatal("ERROR:", err)
 	}
 
+	file.ResultFile.LogTail = tail
+
 	go func() {
 		for line := range tail.Lines {
-			handleKeywords(line.Text)
+			handleKeywords(*file, line.Text)
 		}
 	}()
 
-	return tail
 }
 
-func getLogFile() string {
+func setLogFile() {
 	c := config.Cfg
-	result := ""
+	for i, v := range c.WatchFiles {
+		if v.PathIsFile {
+			c.WatchFiles[i].ResultFile.FileName = v.Path
+			continue
+		}
 
-	if config.Cfg.PathIsFile {
-		return c.Path
+		filepath.Walk(v.Path, func(path string, info os.FileInfo, err error) error {
+			cfgPath := v.Path
+			if strings.HasSuffix(cfgPath, "/") {
+				cfgPath = string([]rune(cfgPath)[:len(cfgPath)-1])
+			}
+
+			//只读取root目录的log
+			if filepath.Dir(path) != cfgPath {
+				log.Println("DEBUG: ", path, "not in root path, ignoring , Dir:", filepath.Dir(path), "cofig path:", cfgPath)
+				return err
+			}
+
+			if strings.HasPrefix(path, v.Prefix) && strings.HasSuffix(path, v.Suffix) && !info.IsDir() {
+				if c.WatchFiles[i].ResultFile.FileName == "" || info.ModTime().After(c.WatchFiles[i].ResultFile.ModTime) {
+					c.WatchFiles[i].ResultFile.FileName = path
+					c.WatchFiles[i].ResultFile.ModTime = info.ModTime()
+				}
+				return err
+			}
+
+			return err
+		})
 	}
 
-	filepath.Walk(c.Path, func(path string, info os.FileInfo, err error) error {
-		cfgPath := config.Cfg.Path
-		if strings.HasSuffix(cfgPath, "/") {
-			cfgPath = string([]rune(cfgPath)[:len(cfgPath)-1])
-		}
-
-		//只读取root目录的log
-		if filepath.Dir(path) != cfgPath {
-			log.Println("DEBUG: ", path, "not in root path, ignoring , Dir:", filepath.Dir(path), "cofig path:", cfgPath)
-			return err
-		}
-
-		if strings.HasPrefix(path, config.Cfg.Prefix) && strings.HasSuffix(path, config.Cfg.Suffix) && !info.IsDir() {
-			result = path
-			return err
-		}
-
-		return err
-	})
-
-	return result
 }
 
 // 查找关键词
-func handleKeywords(line string) {
-	c := config.Cfg
-	for _, p := range c.Keywords {
+func handleKeywords(file config.WatchFile, line string) {
+	for _, p := range file.Keywords {
 		value := 0.0
 		if p.Regex.MatchString(line) {
 			value = 1.0
@@ -160,11 +169,11 @@ func handleKeywords(line string) {
 			d.Value += value
 			data = d
 		} else {
-			data = config.PushData{Metric: c.Metric,
-				Endpoint:    c.Host,
+			data = config.PushData{Metric: config.Cfg.Metric,
+				Endpoint:    config.Cfg.Host,
 				Timestamp:   time.Now().Unix(),
 				Value:       value,
-				Step:        c.Timer,
+				Step:        config.Cfg.Timer,
 				CounterType: "GAUGE",
 				Tags:        p.Tag + "=" + p.FixedExp,
 			}
@@ -210,23 +219,25 @@ func postData(m cmap.ConcurrentMap) {
 
 func fillData() {
 	c := config.Cfg
-	for _, p := range c.Keywords {
+	for _, v := range c.WatchFiles {
+		for _, p := range v.Keywords {
 
-		if _, ok := keywords.Get(p.Exp); ok {
-			continue
+			if _, ok := keywords.Get(p.Exp); ok {
+				continue
+			}
+
+			//不存在要插入一个补全
+			data := config.PushData{Metric: c.Metric,
+				Endpoint:    c.Host,
+				Timestamp:   time.Now().Unix(),
+				Value:       0.0,
+				Step:        c.Timer,
+				CounterType: "GAUGE",
+				Tags:        "prefix=" + v.Prefix + ",suffix=" + v.Suffix + "," + p.Tag + "=" + p.FixedExp,
+			}
+
+			keywords.Set(p.Exp, data)
 		}
-
-		//不存在要插入一个补全
-		data := config.PushData{Metric: c.Metric,
-			Endpoint:    c.Host,
-			Timestamp:   time.Now().Unix(),
-			Value:       0.0,
-			Step:        c.Timer,
-			CounterType: "GAUGE",
-			Tags:        p.Tag + "=" + p.FixedExp,
-		}
-
-		keywords.Set(p.Exp, data)
 	}
 
 }

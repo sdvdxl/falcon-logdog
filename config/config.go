@@ -4,23 +4,36 @@ import (
 	"encoding/json"
 	"github.com/fsnotify/fsnotify"
 	"github.com/go-errors/errors"
+	"github.com/hpcloud/tail"
 	"io/ioutil"
 	"log"
 	"os"
 	"regexp"
 	"strings"
+	"time"
 )
 
 type Config struct {
-	Metric     string //度量名称,比如log.console 或者log
-	Timer      int    // 每隔多长时间（秒）上报
-	Host       string //主机名称
+	Metric     string      //度量名称,比如log.console 或者log
+	Timer      int         // 每隔多长时间（秒）上报
+	Host       string      //主机名称
+	Agent      string      //agent api url
+	WatchFiles []WatchFile `json:"files"`
+}
+
+type resultFile struct {
+	FileName string
+	ModTime  time.Time
+	LogTail  *tail.Tail
+}
+
+type WatchFile struct {
 	Path       string //路径
 	Prefix     string //log前缀
 	Suffix     string //log后缀
-	Agent      string //agent api url
 	Keywords   []keyWord
-	PathIsFile bool //path 是否是文件
+	PathIsFile bool       //path 是否是文件
+	ResultFile resultFile `json:"-"`
 }
 
 type keyWord struct {
@@ -91,15 +104,7 @@ func ReadConfig(configFile string) (*Config, error) {
 
 // 检查配置项目是否正确
 func checkConfig(config *Config) error {
-	//检查路径
-	fInfo, err := os.Stat(config.Path)
-	if err != nil {
-		return err
-	}
-
-	if !fInfo.IsDir() {
-		config.PathIsFile = true
-	}
+	var err error
 
 	//检查 host
 	if config.Host == "" {
@@ -111,35 +116,47 @@ func checkConfig(config *Config) error {
 
 	}
 
-	//检查后缀,如果没有,则默认为.log
-	config.Prefix = strings.TrimSpace(config.Prefix)
-	config.Suffix = strings.TrimSpace(config.Suffix)
-	if config.Suffix == "" {
-		log.Println("INFO: suffix is no set, will use .log")
-		config.Suffix = ".log"
-	}
-
-	//agent不检查,可能后启动agent
-
-	//检查keywords
-	if len(config.Keywords) == 0 {
-		return errors.New("ERROR: keyword list not set")
-	}
-
-	for _, v := range config.Keywords {
-		if v.Exp == "" || v.Tag == "" {
-			return errors.New("ERROR: keyword's exp and tag are requierd")
-		}
-	}
-
-	// 设置正则表达式
-	for i, v := range config.Keywords {
-
-		if config.Keywords[i].Regex, err = regexp.Compile(v.Exp); err != nil {
+	for i, v := range config.WatchFiles {
+		//检查路径
+		fInfo, err := os.Stat(v.Path)
+		if err != nil {
 			return err
 		}
 
-		config.Keywords[i].FixedExp = string(fixExpRegex.ReplaceAll([]byte(v.Exp), []byte(".")))
+		if !fInfo.IsDir() {
+			config.WatchFiles[i].PathIsFile = true
+		}
+
+		//检查后缀,如果没有,则默认为.log
+		config.WatchFiles[i].Prefix = strings.TrimSpace(v.Prefix)
+		config.WatchFiles[i].Suffix = strings.TrimSpace(v.Suffix)
+		if config.WatchFiles[i].Suffix == "" {
+			log.Println("INFO: file pre ", config.WatchFiles[i].Path, "suffix is no set, will use .log")
+			config.WatchFiles[i].Suffix = ".log"
+		}
+
+		//agent不检查,可能后启动agent
+
+		//检查keywords
+		if len(v.Keywords) == 0 {
+			return errors.New("ERROR: keyword list not set")
+		}
+
+		for _, v := range v.Keywords {
+			if v.Exp == "" || v.Tag == "" {
+				return errors.New("ERROR: keyword's exp and tag are requierd")
+			}
+		}
+
+		// 设置正则表达式
+		for i, v := range v.Keywords {
+
+			if config.WatchFiles[i].Keywords[i].Regex, err = regexp.Compile(v.Exp); err != nil {
+				return err
+			}
+
+			config.WatchFiles[i].Keywords[i].FixedExp = string(fixExpRegex.ReplaceAll([]byte(v.Exp), []byte(".")))
+		}
 	}
 
 	return nil
