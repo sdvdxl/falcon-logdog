@@ -145,20 +145,20 @@ func checkConfig(config *Config) error {
 			return errors.New("ERROR: keyword list not set")
 		}
 
-		for _, v := range v.Keywords {
-			if v.Exp == "" || v.Tag == "" {
+		for _, keyword := range v.Keywords {
+			if keyword.Exp == "" || keyword.Tag == "" {
 				return errors.New("ERROR: keyword's exp and tag are requierd")
 			}
 		}
 
 		// 设置正则表达式
-		for i, v := range v.Keywords {
+		for j, keyword := range v.Keywords {
 
-			if config.WatchFiles[i].Keywords[i].Regex, err = regexp.Compile(v.Exp); err != nil {
+			if config.WatchFiles[i].Keywords[j].Regex, err = regexp.Compile(keyword.Exp); err != nil {
 				return err
 			}
 
-			config.WatchFiles[i].Keywords[i].FixedExp = string(fixExpRegex.ReplaceAll([]byte(v.Exp), []byte(".")))
+			config.WatchFiles[i].Keywords[j].FixedExp = string(fixExpRegex.ReplaceAll([]byte(keyword.Exp), []byte(".")))
 		}
 	}
 

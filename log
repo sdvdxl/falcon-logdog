@@ -1,1 +1,0 @@
-INFO: config: &{log 60 10-10-128-53 http://10.10.128.53:1988/v1/push [{/data/logs/test aaa .log [{key1 tag111 key1 key1}] false { 0001-01-01 00:00:00 +0000 UTC <nil>}} {/data/logs/test bbb .log [{key1 tag111  <nil>}] false { 0001-01-01 00:00:00 +0000 UTC <nil>}}]}
