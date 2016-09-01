@@ -211,7 +211,7 @@ func postData() {
 			} else {
 				defer resp.Body.Close()
 				bytes, _ = ioutil.ReadAll(resp.Body)
-				log.Println("INFO:", string(bytes))
+				//log.Println("INFO:", string(bytes))
 			}
 		}
 
@@ -226,7 +226,7 @@ func fillData() {
 		for _, p := range v.Keywords {
 
 			key := v.ResultFile.FileName + p.Tag
-			log.Println("_______", key)
+			//log.Println("_______", key)
 
 			if _, ok := keywords.Get(key); ok {
 				continue
