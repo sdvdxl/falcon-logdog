@@ -5,9 +5,9 @@ import (
 	"github.com/fsnotify/fsnotify"
 	"github.com/hpcloud/tail"
 	"github.com/sdvdxl/falcon-logdog/config"
+	"github.com/sdvdxl/falcon-logdog/log"
 	"github.com/streamrail/concurrent-map"
 	"io/ioutil"
-	"log"
 	"net/http"
 	"os"
 	"path"
@@ -18,12 +18,12 @@ import (
 )
 
 var (
-	logTail  *tail.Tail
 	workers  chan bool
 	keywords cmap.ConcurrentMap
 )
 
 func main() {
+
 	workers = make(chan bool, runtime.NumCPU()*2)
 	keywords = cmap.New()
 	runtime.GOMAXPROCS(runtime.NumCPU())
@@ -33,7 +33,6 @@ func main() {
 		for range ticker.C {
 			fillData()
 
-			//log.Println("INFO: time to push data: ")
 			postData()
 		}
 	}()
@@ -41,7 +40,7 @@ func main() {
 	go func() {
 		setLogFile()
 
-		log.Println("INFO: watch file ", config.Cfg.WatchFiles)
+		log.Info("watch file", config.Cfg.WatchFiles)
 
 		for i := 0; i < len(config.Cfg.WatchFiles); i++ {
 			readFileAndSetTail(&(config.Cfg.WatchFiles[i]))
@@ -51,13 +50,13 @@ func main() {
 
 	}()
 
-	run := make(chan bool)
-	<-run
+	select {}
 }
 func logFileWatcher(file *config.WatchFile) {
+	logTail := file.ResultFile.LogTail
 	watcher, err := fsnotify.NewWatcher()
 	if err != nil {
-		log.Fatal("ERROR:", err)
+		log.Fatal(err)
 	}
 	defer watcher.Close()
 
@@ -67,16 +66,21 @@ func logFileWatcher(file *config.WatchFile) {
 		for {
 			select {
 			case event := <-watcher.Events:
+				log.Debug("event:", event)
+
 				if file.PathIsFile && event.Op == fsnotify.Create && event.Name == file.Path {
-					log.Println("INFO: continue to watch file:", event.Name)
-					if logTail != nil {
+					log.Info("continue to watch file:", event.Name)
+					if file.ResultFile.LogTail != nil {
 						logTail.Stop()
 					}
 
 					readFileAndSetTail(file)
 				} else {
-					if event.Op == fsnotify.Create {
-						log.Println("INFO: created file", event.Name, path.Base(event.Name))
+
+					if file.ResultFile.FileName == event.Name && (event.Op == fsnotify.Remove || event.Op == fsnotify.Rename) {
+						log.Warn(event, "stop to tail")
+					} else if event.Op == fsnotify.Create {
+						log.Infof("created file %v, basePath:%v", event.Name, path.Base(event.Name))
 						if strings.HasSuffix(event.Name, file.Suffix) && strings.HasPrefix(path.Base(event.Name), file.Prefix) {
 							if logTail != nil {
 								logTail.Stop()
@@ -89,30 +93,44 @@ func logFileWatcher(file *config.WatchFile) {
 				}
 
 			case err := <-watcher.Errors:
-				log.Println("ERROR:", err)
+				log.Error(err)
 			}
 		}
 	}()
 
-	err = watcher.Add(filepath.Dir(file.Path))
+	watchPath := file.Path
+	if file.PathIsFile {
+		watchPath = filepath.Dir(file.Path)
+	}
+	err = watcher.Add(watchPath)
 	if err != nil {
-		log.Fatal("ERROR:", err)
+		log.Fatal(err)
 
 	}
 	<-done
 }
 
 func readFileAndSetTail(file *config.WatchFile) {
-	log.Println("INFO: read file", file.ResultFile.FileName)
+	if file.ResultFile.FileName == "" {
+		return
+	}
+	_, err := os.Stat(file.ResultFile.FileName)
+	if err != nil {
+		log.Error(file.ResultFile.FileName, err)
+		return
+	}
+
+	log.Info("read file", file.ResultFile.FileName)
 	tail, err := tail.TailFile(file.ResultFile.FileName, tail.Config{Follow: true})
 	if err != nil {
-		log.Fatal("ERROR:", err)
+		log.Fatal(err)
 	}
 
 	file.ResultFile.LogTail = tail
 
 	go func() {
 		for line := range tail.Lines {
+			log.Debug("log line: ", line.Text)
 			handleKeywords(*file, line.Text)
 		}
 	}()
@@ -132,15 +150,15 @@ func setLogFile() {
 			if strings.HasSuffix(cfgPath, "/") {
 				cfgPath = string([]rune(cfgPath)[:len(cfgPath)-1])
 			}
-			log.Println(path)
+			log.Debug(path)
 
 			//只读取root目录的log
 			if filepath.Dir(path) != cfgPath && info.IsDir() {
-				log.Println("DEBUG: ", path, "not in root path, ignoring , Dir:", path, "cofig path:", cfgPath)
+				log.Debug(path, "not in root path, ignoring , Dir:", path, "cofig path:", cfgPath)
 				return err
 			}
 
-			log.Println("DEBUG: path", path, "prefix:", v.Prefix, "suffix:", v.Suffix, "base:", filepath.Base(path), "isFile", !info.IsDir())
+			log.Debug("path", path, "prefix:", v.Prefix, "suffix:", v.Suffix, "base:", filepath.Base(path), "isFile", !info.IsDir())
 			if strings.HasPrefix(filepath.Base(path), v.Prefix) && strings.HasSuffix(path, v.Suffix) && !info.IsDir() {
 
 				if c.WatchFiles[i].ResultFile.FileName == "" || info.ModTime().After(c.WatchFiles[i].ResultFile.ModTime) {
@@ -161,6 +179,7 @@ func handleKeywords(file config.WatchFile, line string) {
 	for _, p := range file.Keywords {
 		value := 0.0
 		if p.Regex.MatchString(line) {
+			log.Debugf("exp:%v match ===> line: %v ", p.Regex.String(), line)
 			value = 1.0
 		}
 
@@ -199,19 +218,19 @@ func postData() {
 
 			bytes, err := json.Marshal(data)
 			if err != nil {
-				log.Println("ERROR : marshal push data", data, err)
+				log.Error("marshal push data", data, err)
 				return
 			}
 
-			//log.Println("INFO: pushing data:", string(bytes))
+			log.Debug("pushing data:", string(bytes))
 
 			resp, err := http.Post(c.Agent, "plain/text", strings.NewReader(string(bytes)))
 			if err != nil {
-				log.Println("ERROR: post data ", string(bytes), " to agent ", err)
+				log.Error(" post data ", string(bytes), " to agent ", err)
 			} else {
 				defer resp.Body.Close()
 				bytes, _ = ioutil.ReadAll(resp.Body)
-				//log.Println("INFO:", string(bytes))
+				log.Debug(string(bytes))
 			}
 		}
 

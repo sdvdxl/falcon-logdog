@@ -20,6 +20,7 @@ type Config struct {
 	Host       string      //主机名称
 	Agent      string      //agent api url
 	WatchFiles []WatchFile `json:"files"`
+	LogLevel   string
 }
 
 type resultFile struct {
@@ -68,7 +69,7 @@ var (
 )
 
 func init() {
-	log.SetFlags(log.LUTC | log.Lshortfile)
+
 	var err error
 	Cfg, err = ReadConfig(configFile)
 	if err != nil {
@@ -96,12 +97,14 @@ func ReadConfig(configFile string) (*Config, error) {
 		return nil, err
 	}
 
+	fmt.Println(config.LogLevel)
+
 	// 检查配置项目
 	if err := checkConfig(config); err != nil {
 		return nil, err
 	}
 
-	log.Println("INFO: config init success, start to work ...")
+	log.Println("config init success, start to work ...")
 	return config, nil
 }
 
@@ -115,7 +118,7 @@ func checkConfig(config *Config) error {
 			return err
 		}
 
-		log.Println("INFO: host not set will use system's name:", config.Host)
+		log.Println("host not set will use system's name:", config.Host)
 
 	}
 
@@ -134,7 +137,7 @@ func checkConfig(config *Config) error {
 		config.WatchFiles[i].Prefix = strings.TrimSpace(v.Prefix)
 		config.WatchFiles[i].Suffix = strings.TrimSpace(v.Suffix)
 		if config.WatchFiles[i].Suffix == "" {
-			log.Println("INFO: file pre ", config.WatchFiles[i].Path, "suffix is no set, will use .log")
+			log.Println("file pre ", config.WatchFiles[i].Path, "suffix is no set, will use .log")
 			config.WatchFiles[i].Suffix = ".log"
 		}
 
@@ -158,6 +161,8 @@ func checkConfig(config *Config) error {
 				return err
 			}
 
+			log.Println("INFO: tag:", keyword.Tag, "regex", config.WatchFiles[i].Keywords[j].Regex.String())
+
 			config.WatchFiles[i].Keywords[j].FixedExp = string(fixExpRegex.ReplaceAll([]byte(keyword.Exp), []byte(".")))
 		}
 	}
@@ -180,19 +185,19 @@ func ConfigFileWatcher() {
 			select {
 			case event := <-watcher.Events:
 				if event.Name == configFile && (event.Op == fsnotify.Chmod || event.Op == fsnotify.Rename || event.Op == fsnotify.Write || event.Op == fsnotify.Create) {
-					log.Println("INFO: modified config file", event.Name, "will reaload config")
+					log.Println("modified config file", event.Name, "will reaload config")
 					if cfg, err := ReadConfig(configFile); err != nil {
 						log.Println("ERROR: config has error, will not use old config", err)
 					} else if checkConfig(Cfg) != nil {
 						log.Println("ERROR: config has error, will not use old config", err)
 					} else {
-						log.Println("INFO: config reload success")
+						log.Println("config reload success")
 						Cfg = cfg
 					}
 
 				}
 			case err := <-watcher.Errors:
-				log.Println("ERROR:", err)
+				log.Fatal(err)
 			}
 		}
 	}()
