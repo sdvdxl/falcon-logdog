@@ -3,8 +3,9 @@ falcon-logdog
 falcon-logdog-mac64
 # Created by .ignore support plugin (hsz.mobi)
 ### Eclipse template
-
+.history
 .metadata
+.idea
 bin/
 tmp/
 *.tmp
@@ -227,3 +228,4 @@ bh_unicode_properties.cache
 # Sublime-github package stores a github token in this file
 # https://packagecontrol.io/packages/sublime-github
 GitHub.sublime-settings
+

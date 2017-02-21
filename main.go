@@ -2,11 +2,6 @@ package main
 
 import (
 	"encoding/json"
-	"github.com/fsnotify/fsnotify"
-	"github.com/hpcloud/tail"
-	"github.com/sdvdxl/falcon-logdog/config"
-	"github.com/sdvdxl/falcon-logdog/log"
-	"github.com/streamrail/concurrent-map"
 	"io/ioutil"
 	"net/http"
 	"os"
@@ -15,11 +10,18 @@ import (
 	"runtime"
 	"strings"
 	"time"
+
+	"github.com/fsnotify/fsnotify"
+	"github.com/hpcloud/tail"
+	"github.com/sdvdxl/falcon-logdog/config"
+	"github.com/sdvdxl/falcon-logdog/log"
+	"github.com/streamrail/concurrent-map"
 )
 
 var (
 	workers  chan bool
 	keywords cmap.ConcurrentMap
+	location *tail.SeekInfo
 )
 
 func main() {
@@ -31,6 +33,7 @@ func main() {
 	go func() {
 		ticker := time.NewTicker(time.Second * time.Duration(int64(config.Cfg.Timer)))
 		for range ticker.C {
+			// config.Cfg.SeekInfo.Write(int(location.Offset), location.Whence)
 			fillData()
 
 			postData()
@@ -68,15 +71,20 @@ func logFileWatcher(file *config.WatchFile) {
 			case event := <-watcher.Events:
 				log.Debug("event:", event)
 
-				if file.PathIsFile && event.Op == fsnotify.Create && event.Name == file.Path {
-					log.Info("continue to watch file:", event.Name)
-					if file.ResultFile.LogTail != nil {
-						logTail.Stop()
+				//配置的是一个文件，那么如果变更，要持续监控同一个文件名字
+				if file.PathIsFile {
+					if _, err := os.Stat(file.Path); err != nil {
+						//不存在
+						log.Warnf("file: %v not exist, stopping to watch", file.Path)
+						if file.ResultFile.LogTail != nil {
+							logTail.Stop()
+						}
+					} else {
+						log.Info("continue to watch file:", event.Name)
+						readFileAndSetTail(file)
 					}
 
-					readFileAndSetTail(file)
-				} else {
-
+				} else { //监控的是文件夹
 					if file.ResultFile.FileName == event.Name && (event.Op == fsnotify.Remove || event.Op == fsnotify.Rename) {
 						log.Warn(event, "stop to tail")
 					} else if event.Op == fsnotify.Create {
@@ -111,6 +119,8 @@ func logFileWatcher(file *config.WatchFile) {
 }
 
 func readFileAndSetTail(file *config.WatchFile) {
+	// config.Cfg.SeekInfo.FileName = file.Path
+
 	if file.ResultFile.FileName == "" {
 		return
 	}
@@ -121,15 +131,16 @@ func readFileAndSetTail(file *config.WatchFile) {
 	}
 
 	log.Info("read file", file.ResultFile.FileName)
+	// seekInfo := &tail.SeekInfo{Offset: int64(config.Cfg.SeekInfo.Offset), Whence: config.Cfg.SeekInfo.Whence}
 	tail, err := tail.TailFile(file.ResultFile.FileName, tail.Config{Follow: true})
 	if err != nil {
 		log.Fatal(err)
 	}
-
 	file.ResultFile.LogTail = tail
 
 	go func() {
 		for line := range tail.Lines {
+			location = tail.Location
 			log.Debug("log line: ", line.Text)
 			handleKeywords(*file, line.Text)
 		}
@@ -179,7 +190,7 @@ func handleKeywords(file config.WatchFile, line string) {
 	for _, p := range file.Keywords {
 		value := 0.0
 		if p.Regex.MatchString(line) {
-			log.Debugf("exp:%v match ===> line: %v ", p.Regex.String(), line)
+			log.Infof("exp:%v match ===> line: %v ", p.Regex.String(), line)
 			value = 1.0
 		}
 
