@@ -56,7 +56,7 @@ func main() {
 	select {}
 }
 func logFileWatcher(file *config.WatchFile) {
-	logTail := file.ResultFile.LogTail
+	//logTail := file.ResultFile.LogTail
 	watcher, err := fsnotify.NewWatcher()
 	if err != nil {
 		log.Fatal(err)
@@ -72,12 +72,12 @@ func logFileWatcher(file *config.WatchFile) {
 				log.Debug("event:", event)
 
 				//配置的是一个文件，那么如果变更，要持续监控同一个文件名字
-				if file.PathIsFile {
+				if file.PathIsFile && event.Op == fsnotify.Create && event.Name == file.Path {
 					if _, err := os.Stat(file.Path); err != nil {
 						//不存在
 						log.Warnf("file: %v not exist, stopping to watch", file.Path)
 						if file.ResultFile.LogTail != nil {
-							logTail.Stop()
+							file.ResultFile.LogTail.Stop()
 						}
 					} else {
 						log.Info("continue to watch file:", event.Name)
@@ -87,12 +87,12 @@ func logFileWatcher(file *config.WatchFile) {
 				} else { //监控的是文件夹
 					if file.ResultFile.FileName == event.Name && (event.Op == fsnotify.Remove || event.Op == fsnotify.Rename) {
 						log.Warn(event, "stop to tail")
+						if file.ResultFile.LogTail != nil {
+							file.ResultFile.LogTail.Stop()
+						}
 					} else if event.Op == fsnotify.Create {
 						log.Infof("created file %v, basePath:%v", event.Name, path.Base(event.Name))
 						if strings.HasSuffix(event.Name, file.Suffix) && strings.HasPrefix(path.Base(event.Name), file.Prefix) {
-							if logTail != nil {
-								logTail.Stop()
-							}
 							file.ResultFile.FileName = event.Name
 							readFileAndSetTail(file)
 
@@ -194,8 +194,9 @@ func handleKeywords(file config.WatchFile, line string) {
 			value = 1.0
 		}
 
+		key := file.ResultFile.FileName + p.Tag
 		var data config.PushData
-		if v, ok := keywords.Get(p.Exp); ok {
+		if v, ok := keywords.Get(key); ok {
 			d := v.(config.PushData)
 			d.Value += value
 			data = d
@@ -210,7 +211,7 @@ func handleKeywords(file config.WatchFile, line string) {
 			}
 		}
 
-		keywords.Set(p.Exp, data)
+		keywords.Set(key, data)
 
 	}
 }
@@ -256,7 +257,6 @@ func fillData() {
 		for _, p := range v.Keywords {
 
 			key := v.ResultFile.FileName + p.Tag
-			//log.Println("_______", key)
 
 			if _, ok := keywords.Get(key); ok {
 				continue
