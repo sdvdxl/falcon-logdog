@@ -2,7 +2,7 @@
 open-falcon日志关键词监控
 
 ## 下载
-可以下载2进制包进行安装，也可以clone本库到机器上安装。如果clone觉得慢的话，可以[到这里下载](http://7xrmam.com1.z0.glb.clouddn.com/falcon-logdog.tar.gz)。clone本库的话，请自行编译。`control ` 脚本默认执行的是 `falcon-logdog` 文件。
+可以下载2进制包进行安装，也可以clone本库到机器上安装。clone本库的话，请自行编译。`control ` 脚本默认执行的是 `falcon-logdog` 文件。
 
 ## 配置
 
