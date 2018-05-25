@@ -4,8 +4,8 @@ import (
     "encoding/json"
     "github.com/fsnotify/fsnotify"
     "github.com/hpcloud/tail"
-    "github.com/sdvdxl/falcon-logdog/config"
-    "github.com/sdvdxl/falcon-logdog/log"
+    "github.com/fengyixia/falcon-logdog/config"
+    "github.com/fengyixia/falcon-logdog/log"
     "github.com/streamrail/concurrent-map"
     "io/ioutil"
     "net/http"
@@ -31,7 +31,7 @@ func main() {
     go func() {
         ticker := time.NewTicker(time.Second * time.Duration(int64(config.Cfg.Timer)))
         for range ticker.C {
-            fillData()
+            //fillData()
 
             postData()
         }
@@ -178,7 +178,10 @@ func setLogFile() {
 func handleKeywords(file config.WatchFile, line string) {
     for _, p := range file.Keywords {
         value := 0.0
-        if p.Regex.MatchString(line) {
+        // match all, just incr
+        if p.Regex.String() == ":" {
+            value = 1.0
+        } else if p.Regex.MatchString(line) {
             log.Debugf("exp:%v match ===> line: %v ", p.Regex.String(), line)
             value = 1.0
         }
@@ -222,7 +225,7 @@ func postData() {
                 return
             }
 
-            log.Debug("pushing data:", string(bytes))
+            log.Info("pushing data:", string(bytes))
 
             resp, err := http.Post(c.Agent, "plain/text", strings.NewReader(string(bytes)))
             if err != nil {
